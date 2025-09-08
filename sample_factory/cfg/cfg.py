@@ -672,6 +672,8 @@ def add_eval_args(parser):
         help="Number of frames to render for the video. Defaults to 1e9 which will be the same as having video_frames = max_num_frames. You can also set to -1 which only renders one episode",
     )
     parser.add_argument("--video_name", default=None, type=str, help="Name of video to save")
+    parser.add_argument("--save_frames", action="store_true", help="Save individual frames instead of video")
+    parser.add_argument("--frames_dir", default="frames", type=str, help="Directory to save individual frames")
     parser.add_argument("--max_num_frames", default=1e9, type=int, help="Maximum number of frames for evaluation")
     parser.add_argument("--max_num_episodes", default=1e9, type=int, help="Maximum number of episodes for evaluation")
 

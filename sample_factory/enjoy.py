@@ -1,7 +1,9 @@
+import os
 import time
 from collections import deque
 from typing import Dict, Optional, Tuple
 
+import cv2
 import gymnasium as gym
 import numpy as np
 import torch
@@ -55,15 +57,59 @@ def visualize_policy_inputs(normalized_obs: Dict[str, Tensor]) -> None:
     cv2.waitKey(delay=1)
 
 
-def render_frame(cfg, env, video_frames, num_episodes, last_render_start) -> float:
+def save_frame_to_disk(frame, frames_dir, frame_count, action=None, action_meanings=None):
+    """Save a single frame to disk with optional action information."""
+    os.makedirs(frames_dir, exist_ok=True)
+    frame_path = os.path.join(frames_dir, f"frame_{frame_count:06d}.png")
+    
+    # Convert frame format if needed
+    if frame.shape[0] == 3:  # CHW format
+        frame = frame.transpose(1, 2, 0)  # Convert to HWC
+    
+    # Convert RGB to BGR for cv2
+    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(frame_path, frame_bgr)
+    
+    # Save action info if provided
+    if action is not None:
+        action_path = os.path.join(frames_dir, f"action_{frame_count:06d}.txt")
+        with open(action_path, 'w') as f:
+            # Convert action to human-readable format if meanings are available
+            if action_meanings is not None:
+                # Handle both single actions and batch actions
+                if hasattr(action, '__len__'):
+                    if len(action.shape) > 0:
+                        action_idx = int(action[0]) if len(action) > 0 else 0
+                    else:
+                        action_idx = int(action)
+                else:
+                    action_idx = int(action)
+                
+                if 0 <= action_idx < len(action_meanings):
+                    action_str = f"{action_idx}: {action_meanings[action_idx]}"
+                else:
+                    action_str = f"{action_idx}: UNKNOWN"
+            else:
+                action_str = str(action)
+            
+            f.write(action_str)
+    
+    return frame_path
+
+def render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count=0, frames_dir=None, action=None, action_meanings=None) -> float:
     render_start = time.time()
 
-    if cfg.save_video:
+    if cfg.save_video or cfg.save_frames:
         need_video_frame = len(video_frames) < cfg.video_frames or cfg.video_frames < 0 and num_episodes == 0
         if need_video_frame:
             frame = env.render()
             if frame is not None:
-                video_frames.append(frame.copy())
+                if cfg.save_frames:
+                    # Save individual frame to disk
+                    save_frame_to_disk(frame, frames_dir, frame_count, action, action_meanings)
+                if cfg.save_video:
+                    # Append to video frames list
+                    video_frames.append(frame.copy())
     else:
         if not cfg.no_render:
             target_delay = 1.0 / cfg.fps if cfg.fps > 0 else 0
@@ -116,7 +162,7 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
     cfg.num_envs = 1
 
     render_mode = "human"
-    if cfg.save_video:
+    if cfg.save_video or cfg.save_frames:
         render_mode = "rgb_array"
     elif cfg.no_render:
         render_mode = None
@@ -155,6 +201,23 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
 
     video_frames = []
     num_episodes = 0
+    frame_count = 0
+    
+    # Setup frames directory if saving frames
+    frames_dir = None
+    action_meanings = None
+    if cfg.save_frames:
+        frames_dir = os.path.join(experiment_dir(cfg=cfg), cfg.frames_dir)
+        os.makedirs(frames_dir, exist_ok=True)
+        log.info(f"Saving frames to {frames_dir}")
+        
+        # Try to get action meanings for human-readable output
+        try:
+            if hasattr(env.unwrapped, 'get_action_meanings'):
+                action_meanings = env.unwrapped.get_action_meanings()
+                log.info(f"Action meanings: {action_meanings}")
+        except Exception as e:
+            log.debug(f"Could not get action meanings: {e}")
 
     with torch.no_grad():
         while not max_frames_reached(num_frames):
@@ -179,7 +242,10 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
             rnn_states = policy_outputs["new_rnn_states"]
 
             for _ in range(render_action_repeat):
-                last_render_start = render_frame(cfg, env, video_frames, num_episodes, last_render_start)
+                # Convert actions to numpy array for saving
+                actions_numpy = actions.cpu().numpy() if torch.is_tensor(actions) else actions
+                last_render_start = render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, actions_numpy, action_meanings)
+                frame_count += 1
 
                 obs, rew, terminated, truncated, infos = env.step(actions)
                 action_mask = obs.pop("action_mask").to(device) if "action_mask" in obs else None
@@ -229,7 +295,9 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
 
                 # if episode terminated synchronously for all agents, pause a bit before starting a new one
                 if all(dones):
-                    render_frame(cfg, env, video_frames, num_episodes, last_render_start)
+                    actions_numpy = actions.cpu().numpy() if torch.is_tensor(actions) else actions
+                    render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, actions_numpy, action_meanings)
+                    frame_count += 1
                     time.sleep(0.05)
 
                 if all(finished_episode):
@@ -274,6 +342,9 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
         else:
             fps = 30
         generate_replay_video(experiment_dir(cfg=cfg), video_frames, fps, cfg)
+    
+    if cfg.save_frames:
+        log.info(f"Saved {frame_count} frames to {frames_dir}")
 
     if cfg.push_to_hub:
         generate_model_card(
@@ -287,6 +358,9 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
         )
         push_to_hf(experiment_dir(cfg=cfg), cfg.hf_repository)
 
-    return ExperimentStatus.SUCCESS, sum([sum(episode_rewards[i]) for i in range(env.num_agents)]) / sum(
-        [len(episode_rewards[i]) for i in range(env.num_agents)]
-    )
+    total_episodes = sum([len(episode_rewards[i]) for i in range(env.num_agents)])
+    if total_episodes > 0:
+        avg_reward = sum([sum(episode_rewards[i]) for i in range(env.num_agents)]) / total_episodes
+    else:
+        avg_reward = 0.0
+    return ExperimentStatus.SUCCESS, avg_reward
