@@ -1,7 +1,7 @@
 python3 -m sf_examples.atari.enjoy_atari \
     --env=atari_alien \
-    --experiment=atari_2B_atari_alien_1111 \
-    --train_dir=./checkpoints \
+    --experiment=edbeeching_atari_2B_atari_alien_1111 \
+    --train_dir=/opt/tiger/sample-factory/checkpoints \
     --device=cpu \
     --save_video \
     --video_frames=500 \

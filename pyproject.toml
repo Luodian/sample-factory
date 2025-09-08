@@ -6,6 +6,76 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "sample-factory"
+version = "2.1.3"
+description = "High throughput asynchronous reinforcement learning framework"
+authors = [{name = "Aleksei Petrenko"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["asynchronous", "reinforcement learning", "policy gradient", "ppo", "appo", "impala", "ai"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy>=1.18.1,<2.0",
+    "torch>=1.9,<3.0,!=1.13.0",
+    "gymnasium>=0.27,<1.0",
+    "pyglet",
+    "tensorboard>=1.15.0",
+    "tensorboardx>=2.0",
+    "psutil>=5.7.0",
+    "threadpoolctl>=2.0.0",
+    "colorlog",
+    "signal-slot-mp>=1.0.3,<2.0",
+    "filelock",
+    "wandb>=0.12.9",
+    "huggingface-hub>=0.10.0,<1.0",
+    "pandas",
+    "opencv-python",
+]
+
+[project.urls]
+Homepage = "https://github.com/alex-petrenko/sample-factory"
+Repository = "https://github.com/alex-petrenko/sample-factory"
+Videos = "https://sites.google.com/view/sample-factory"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort>=5.12",
+    "pytest<8.0",
+    "flake8",
+    "pre-commit",
+    "twine",
+    "mkdocs-material",
+    "mkdocs-minify-plugin",
+    "mkdocs-redirects",
+    "mkdocs-git-revision-date-localized-plugin",
+    "mkdocs-git-committers-plugin-2",
+    "mkdocs-git-authors-plugin",
+    "gymnasium[atari, accept-rom-license]",
+    "gymnasium[mujoco]",
+    "mujoco<2.5",
+    "onnx",
+    "onnxruntime",
+    "pettingzoo[classic]",
+]
+atari = ["gymnasium[atari, accept-rom-license]"]
+envpool = ["envpool"]
+mujoco = ["gymnasium[mujoco]", "mujoco<2.5"]
+nethack = ["nle~=1.0", "gymnasium<1.0"]
+onnx = ["onnx", "onnxruntime"]
+pettingzoo = ["pettingzoo[classic]"]
+vizdoom = ["vizdoom<2.0", "gymnasium[classic_control]"]
+
 [tool.black]
 line-length = 120
 target-version = ['py38']

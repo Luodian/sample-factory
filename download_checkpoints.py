@@ -22,7 +22,7 @@ def download_model(model_id, base_path):
         return f"✗ {model_id}: {str(e)}"
 
 def main():
-    base_path = "/mnt/bn/seed-aws-va/brianli/checkpoints"
+    base_path = "./checkpoints"
     
     # Get all atari_2B models from edbeeching
     print("Fetching model list...")
