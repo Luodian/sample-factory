@@ -14,6 +14,14 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
 
+# Register Atari environments at import time
+try:
+    import gymnasium as gym
+    import ale_py
+    gym.register_envs(ale_py)
+except ImportError:
+    pass
+
 # ANSI color codes
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -71,8 +79,9 @@ def sample_environment(args):
         os.makedirs(temp_dir, exist_ok=True)
         
         # Prepare the command for a single episode
+        # Use the current Python interpreter to ensure correct environment
         cmd = [
-            'python3', '-m', 'sf_examples.atari.enjoy_atari',
+            sys.executable, '-m', 'sf_examples.atari.enjoy_atari',
             '--env', env_name,
             '--experiment', experiment,
             '--train_dir', checkpoint_dir,
@@ -100,6 +109,10 @@ def sample_environment(args):
                 timeout=30  # 30 second timeout per episode
             )
             
+            # Check for errors in the result
+            if result.returncode != 0:
+                print(f"Error running {env_name}: {result.stderr[:500]}")
+            
             # Move frames from temp to episode directory
             if os.path.exists(temp_dir):
                 saved_frames = glob.glob(os.path.join(temp_dir, 'frame_*.png'))
@@ -113,10 +126,12 @@ def sample_environment(args):
             
         except subprocess.TimeoutExpired:
             # Clean up temp directory on timeout
+            print(f"Timeout for {env_name}")
             shutil.rmtree(temp_dir, ignore_errors=True)
             continue
         except Exception as e:
             # Clean up temp directory on error
+            print(f"Exception for {env_name}: {e}")
             shutil.rmtree(temp_dir, ignore_errors=True)
             continue
     

@@ -1,2 +1,2 @@
-1. Use uv to install the dependencies.
+1. Use uv to install the dependencies, but do not use `uv run` to run the script.
 2. For most of the tasks, it's better to write simple script and avoid nested abstraction unless be told to design the framework.
