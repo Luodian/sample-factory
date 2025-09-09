@@ -145,3 +145,6 @@ wandb/
 cmake-build*
 sf_examples/vizdoom/doom/multiplayer/tests/_vizdoom/
 checkpoints/
+sampled_frames
+sampled_frames_organized
+sampled_vizdoom_frames
