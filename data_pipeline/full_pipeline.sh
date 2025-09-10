@@ -23,7 +23,7 @@ python3 sample_all_envs.py \
     --max-episodes 3 \
     --randomness 0.2 \
     --parallel 8 \
-    --output-dir /opt/tiger/atari_2B/sampled_frames_organized || {
+    --output-dir /mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_organized || {
     echo "ERROR: Frame sampling failed"
     exit 1
 }
@@ -33,7 +33,7 @@ echo "Step 2: Converting to training data format..."
 echo "----------------------------------------"
 # Step 2: Convert sampled frames to training parquet
 python3 convert_to_training_data.py \
-    --input-dir /opt/tiger/atari_2B/sampled_frames_organized \
+    --input-dir /mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_organized \
     --output-file atari_training_data.parquet \
     --format interleaved || {
     echo "ERROR: Conversion to training data failed"

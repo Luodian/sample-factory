@@ -48,8 +48,8 @@ def sample_environment(args):
     env_name = extract_env_name(experiment)
     env_output_dir = os.path.join(output_base_dir, env_name)
     
-    # Calculate frames per episode
-    frames_per_episode = frames_per_env // max_episodes if max_episodes > 0 else frames_per_env
+    # Use frames_per_env as frames per episode (not divided by episodes)
+    frames_per_episode = frames_per_env
     
     # Skip if already processed with enough episodes
     if os.path.exists(env_output_dir):
@@ -169,7 +169,7 @@ def main():
     parser.add_argument('--output-dir', default='/opt/tiger/sample-factory/sampled_frames',
                         help='Output directory for sampled frames')
     parser.add_argument('--frames-per-env', type=int, default=100,
-                        help='Number of frames to sample per environment (across all episodes)')
+                        help='Number of frames to sample per episode')
     parser.add_argument('--max-episodes', type=int, default=1,
                         help='Maximum episodes to run per environment')
     parser.add_argument('--randomness', type=float, default=0.2,
