@@ -148,3 +148,4 @@ checkpoints/
 sampled_frames
 sampled_frames_organized
 sampled_vizdoom_frames
+*.parquet

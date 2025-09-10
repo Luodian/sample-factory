@@ -19,7 +19,7 @@ echo "Step 1: Sampling frames from Atari environments..."
 echo "----------------------------------------"
 python3 sample_all_envs.py \
     --checkpoint-dir /opt/tiger/atari_2B/checkpoints \
-    --frames-per-env 60 \
+    --frames-per-env 32 \
     --max-episodes 3 \
     --randomness 0.2 \
     --parallel 8 \
