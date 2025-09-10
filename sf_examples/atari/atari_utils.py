@@ -77,7 +77,7 @@ ATARI_ENVS = [
     AtariSpec("atari_solaris", "SolarisNoFrameskip-v4"),
     AtariSpec("atari_spaceinvaders", "SpaceInvadersNoFrameskip-v4"),
     AtariSpec("atari_stargunner", "StarGunnerNoFrameskip-v4"),
-    AtariSpec("atari_surround", "SurroundNoFrameskip-v4"),
+    AtariSpec("atari_surround", "ALE/Surround-v5"),
     AtariSpec("atari_tennis", "TennisNoFrameskip-v4"),
     AtariSpec("atari_timepilot", "TimePilotNoFrameskip-v4"),
     AtariSpec("atari_tutankham", "TutankhamNoFrameskip-v4"),

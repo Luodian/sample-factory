@@ -133,7 +133,7 @@ def create_interleaved_format(data_points, env_name):
         inputs = []
         images = []
         
-        # Add environment description
+        # Add environment description - clean dictionary with only needed fields
         inputs.append({
             "type": "text",
             "has_loss": 0,
@@ -145,14 +145,14 @@ def create_interleaved_format(data_points, env_name):
             # Add image
             images.append(dp['image'])
             
-            # Add image generation marker
+            # Add image generation marker - clean dictionary with only needed fields
             inputs.append({
                 "type": "image_gen",
                 "has_loss": 1,
-                "image_index": i
+                "image_index": i  # Keep as regular int, will be preserved properly
             })
             
-            # Add action (except for last frame)
+            # Add action (except for last frame) - clean dictionary with only needed fields
             if i < len(ep_data) - 1:
                 inputs.append({
                     "type": "text",
@@ -253,6 +253,17 @@ def main():
     
     # Create DataFrame
     df = pd.DataFrame(all_data)
+    
+    # Post-process inputs to ensure clean format (remove None values from dictionaries)
+    if 'inputs' in df.columns and args.format == 'interleaved':
+        def clean_input_entry(entry):
+            """Remove None values from input dictionaries."""
+            if entry['type'] == 'text':
+                return {'type': 'text', 'has_loss': entry['has_loss'], 'text': entry['text']}
+            else:  # image_gen
+                return {'type': 'image_gen', 'has_loss': entry['has_loss'], 'image_index': int(entry['image_index'])}
+        
+        df['inputs'] = df['inputs'].apply(lambda inputs: [clean_input_entry(inp) for inp in inputs])
     
     print(f"\nTotal data points: {len(df)}")
     print(f"DataFrame columns: {df.columns.tolist()}")
