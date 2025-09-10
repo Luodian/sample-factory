@@ -11,7 +11,7 @@ import subprocess
 import argparse
 import shutil
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
 # Register Atari environments at import time
@@ -43,6 +43,13 @@ def extract_env_name(experiment_name):
 
 def sample_environment(args):
     """Sample frames from a single environment."""
+    # Re-import needed modules in worker process (for spawn method)
+    import os
+    import sys
+    import subprocess
+    import glob
+    import shutil
+    
     experiment, checkpoint_dir, output_base_dir, frames_per_env, max_episodes, device, randomness = args
     
     env_name = extract_env_name(experiment)
@@ -232,9 +239,12 @@ def main():
     failed_count = 0
     skipped_count = 0
     
-    with ProcessPoolExecutor(max_workers=args.parallel) as executor:
+    print(f"Starting parallel processing with {args.parallel} workers...")
+    
+    with ThreadPoolExecutor(max_workers=args.parallel) as executor:
         # Submit all tasks
         future_to_env = {executor.submit(sample_environment, arg): arg[0] for arg in task_args}
+        print(f"Submitted {len(future_to_env)} tasks to executor")
         
         # Process completed tasks
         for i, future in enumerate(as_completed(future_to_env), 1):
@@ -282,4 +292,7 @@ def main():
 
 
 if __name__ == '__main__':
+    # Multiprocessing guard to prevent hanging
+    import multiprocessing
+    multiprocessing.set_start_method('spawn', force=True)
     sys.exit(main())
