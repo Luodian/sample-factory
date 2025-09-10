@@ -39,7 +39,7 @@ def sample_single_env(env_name, checkpoint_dir, output_dir, frames_per_env, max_
     
     # Use the sample_environment function from sample_all_envs.py
     args = (experiment, checkpoint_dir, output_dir, frames_per_env, max_episodes, device, randomness)
-    env_name_result, status, frame_count = sample_environment(args)
+    _, status, frame_count = sample_environment(args)
     
     if status == 'success':
         print(f"Successfully sampled {frame_count} frames for {env_name}")
@@ -177,7 +177,7 @@ def main():
         success = sample_single_env(
             args.env_name,
             args.checkpoint_dir,
-            os.path.join(args.frames_dir, args.env_name),
+            args.frames_dir,  # Pass base frames dir, not env-specific
             args.frames_per_env,
             args.max_episodes,
             args.randomness,

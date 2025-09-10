@@ -9,9 +9,9 @@ CHECKPOINT_DIR="/opt/tiger/atari_2B/checkpoints"
 FRAMES_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_individual"
 PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_individual"
 FRAMES_PER_ENV=32
-MAX_EPISODES=100
+MAX_EPISODES=1
 RANDOMNESS=0.2
-PARALLEL_JOBS=8
+PARALLEL_JOBS=1
 
 echo "=== Individual Atari Environment Processing Pipeline ==="
 echo "Configuration:"
