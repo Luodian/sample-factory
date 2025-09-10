@@ -20,7 +20,7 @@ echo "----------------------------------------"
 python3 sample_all_envs.py \
     --checkpoint-dir /opt/tiger/atari_2B/checkpoints \
     --frames-per-env 32 \
-    --max-episodes 3 \
+    --max-episodes 3000 \
     --randomness 0.2 \
     --parallel 8 \
     --output-dir /mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_organized || {
