@@ -111,11 +111,18 @@ def sample_environment(args):
             
             # Check for errors in the result
             if result.returncode != 0:
-                print(f"Error running {env_name}: {result.stderr[:500]}")
+                print(f"Error running {env_name}:")
+                print(result.stderr)
             
-            # Move frames from temp to episode directory
+            # Check both possible locations for saved frames
+            # enjoy_atari might save to a path relative to checkpoint dir
+            alt_temp_dir = os.path.join(checkpoint_dir, experiment, 'sampled_frames_organized', env_name, f'temp_episode_{episode_idx}')
+            
+            # Check primary location first
             if os.path.exists(temp_dir):
                 saved_frames = glob.glob(os.path.join(temp_dir, 'frame_*.png'))
+                if not saved_frames:
+                    saved_frames = glob.glob(os.path.join(temp_dir, 'action_*.txt'))
                 if saved_frames:
                     # Rename temp to final episode directory
                     os.rename(temp_dir, episode_dir)
@@ -123,6 +130,20 @@ def sample_environment(args):
                 else:
                     # Clean up empty temp directory
                     shutil.rmtree(temp_dir, ignore_errors=True)
+            # Check alternate location (checkpoint-relative path)
+            elif os.path.exists(alt_temp_dir):
+                saved_frames = glob.glob(os.path.join(alt_temp_dir, 'frame_*.png'))
+                if not saved_frames:
+                    saved_frames = glob.glob(os.path.join(alt_temp_dir, 'action_*.txt'))
+                if saved_frames:
+                    # Move from alt location to correct location
+                    os.makedirs(os.path.dirname(episode_dir), exist_ok=True)
+                    try:
+                        shutil.move(alt_temp_dir, episode_dir)
+                        total_frames_saved += len(saved_frames)
+                    except Exception as e:
+                        print(f"Failed to move {alt_temp_dir} to {episode_dir}: {e}")
+                        total_frames_saved += len(saved_frames)  # Count them anyway
             
         except subprocess.TimeoutExpired:
             # Clean up temp directory on timeout
@@ -187,8 +208,9 @@ def main():
         print(f"{RED}No checkpoint directories found matching pattern: {pattern}{NC}")
         return 1
     
-    # Extract experiment names
-    experiments = [os.path.basename(d) for d in experiment_dirs]
+    # Extract experiment names, filter out the typo directories
+    experiments = [os.path.basename(d) for d in experiment_dirs 
+                   if 'edbeeching' in os.path.basename(d)]  # Only use correctly spelled directories
     
     print(f"{GREEN}Found {len(experiments)} environment(s) to sample{NC}")
     print(f"Output directory: {YELLOW}{args.output_dir}{NC}")
