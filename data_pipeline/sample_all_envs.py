@@ -93,7 +93,8 @@ def sample_environment(args):
             '--device', device,
             '--save_frames',
             '--frames_dir', temp_dir,
-            '--video_frames', str(frames_per_episode) if save_video else str(frames_per_episode),
+            # Ensure video collects the full episode when saving video
+            '--video_frames', '-1' if save_video else str(frames_per_episode),
             '--max_num_frames', str(frames_per_episode),  # IMPORTANT: Hard limit on frames
             '--max_num_episodes', '1',  # Only one episode at a time
             '--no_render'
@@ -101,9 +102,11 @@ def sample_environment(args):
         
         # Add video saving if requested
         if save_video:
+            # Save video in parent env directory with descriptive name
+            video_path = os.path.join(env_output_dir, f'{env_name}_episode_{episode_idx:03d}_rand{randomness:.1f}.mp4')
             cmd.extend([
                 '--save_video',
-                '--video_name', os.path.join(temp_dir, 'episode_video.mp4'),
+                '--video_name', video_path,
                 '--fps', '1'  # 1 FPS since each action determines one frame
             ])
         
@@ -297,8 +300,11 @@ def main():
                 env_name = os.path.basename(env_dir)
                 episode_dirs = sorted([d for d in os.listdir(env_dir) 
                                      if os.path.isdir(os.path.join(env_dir, d)) and d.startswith('episode_')])
+                videos = sorted(glob.glob(os.path.join(env_dir, '*.mp4')))
                 if episode_dirs:
                     print(f"\n  {env_name}/")
+                    if videos:
+                        print(f"    ├── {len(videos)} video(s) in main folder")
                     for ep_dir in episode_dirs[:3]:
                         frame_count = len(glob.glob(os.path.join(env_dir, ep_dir, 'frame_*.png')))
                         action_count = len(glob.glob(os.path.join(env_dir, ep_dir, 'action_*.txt')))
