@@ -2,12 +2,13 @@
 
 # Configuration
 CHECKPOINT_DIR="/opt/tiger/atari_2B/checkpoints"
-FRAMES_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_individual_v2"
+FRAMES_DIR="/tmp/test_frames"
 PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_individual_v2"
-FRAMES_PER_ENV=256
+FRAMES_PER_ENV=1024
 MAX_EPISODES=3
 RANDOMNESS=0.1
-EPSILON_GREEDY=0.2  # 30% random actions for better diversity
+EPSILON_GREEDY=0.2  # 20% random actions for better diversity
+SAVE_VIDEO=true  # Save video for each episode
 
 echo "=== Simple Atari Pipeline ==="
 echo "Checkpoint dir: $CHECKPOINT_DIR"
@@ -104,6 +105,7 @@ for env_name in $ENVS; do
         --max-episodes $MAX_EPISODES \
         --randomness $RANDOMNESS \
         --epsilon-greedy $EPSILON_GREEDY \
+        $([ "$SAVE_VIDEO" = "true" ] && echo "--save-video") \
         --device cpu
     
     if [ $? -eq 0 ]; then

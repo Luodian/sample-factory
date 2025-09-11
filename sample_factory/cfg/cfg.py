@@ -695,6 +695,13 @@ def add_eval_args(parser):
         type=str2bool,
         help="False to sample from action distributions at test time. True to just use the argmax.",
     )
+    
+    parser.add_argument(
+        "--epsilon_greedy",
+        default=0.0,
+        type=float,
+        help="Epsilon for epsilon-greedy exploration during evaluation (0.0=no exploration, 0.3=30% random actions)",
+    )
 
     parser.add_argument(
         "--train_script",

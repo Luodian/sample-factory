@@ -57,7 +57,7 @@ def visualize_policy_inputs(normalized_obs: Dict[str, Tensor]) -> None:
     cv2.waitKey(delay=1)
 
 
-def save_frame_to_disk(frame, frames_dir, frame_count, action=None, action_meanings=None):
+def save_frame_to_disk(frame, frames_dir, frame_count, action=None, action_meanings=None, is_last_frame=False):
     """Save a single frame to disk with optional action information."""
     os.makedirs(frames_dir, exist_ok=True)
     frame_path = os.path.join(frames_dir, f"frame_{frame_count:06d}.png")
@@ -70,8 +70,9 @@ def save_frame_to_disk(frame, frames_dir, frame_count, action=None, action_meani
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     cv2.imwrite(frame_path, frame_bgr)
     
-    # Save action info if provided
-    if action is not None:
+    # Save action info if provided and not the last frame
+    # The last frame has no action because it's the terminal state
+    if action is not None and not is_last_frame:
         action_path = os.path.join(frames_dir, f"action_{frame_count:06d}.txt")
         with open(action_path, 'w') as f:
             # Convert action to human-readable format if meanings are available
@@ -96,7 +97,7 @@ def save_frame_to_disk(frame, frames_dir, frame_count, action=None, action_meani
     
     return frame_path
 
-def render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count=0, frames_dir=None, action=None, action_meanings=None) -> float:
+def render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count=0, frames_dir=None, action=None, action_meanings=None, is_last_frame=False) -> float:
     render_start = time.time()
 
     if cfg.save_video or cfg.save_frames:
@@ -106,7 +107,7 @@ def render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_
             if frame is not None:
                 if cfg.save_frames:
                     # Save individual frame to disk
-                    save_frame_to_disk(frame, frames_dir, frame_count, action, action_meanings)
+                    save_frame_to_disk(frame, frames_dir, frame_count, action, action_meanings, is_last_frame)
                 if cfg.save_video:
                     # Append to video frames list
                     video_frames.append(frame.copy())
@@ -261,23 +262,12 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
                 # Convert actions to numpy array for saving
                 actions_numpy = actions.cpu().numpy() if torch.is_tensor(actions) else actions
                 
-                # Save the current frame (state before action)
-                last_render_start = render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, None, action_meanings)
-                frame_count += 1
+                # Check if this will be the last frame
+                is_last = cfg.max_num_frames is not None and num_frames >= cfg.max_num_frames
                 
-                # Save the action that will be executed from this frame
-                if cfg.save_frames and frames_dir is not None:
-                    action_path = os.path.join(frames_dir, f"action_{frame_count-1:06d}.txt")
-                    with open(action_path, 'w') as f:
-                        if action_meanings is not None and hasattr(actions_numpy, '__len__'):
-                            action_idx = int(actions_numpy[0]) if len(actions_numpy) > 0 else 0
-                            if 0 <= action_idx < len(action_meanings):
-                                action_str = f"{action_idx}: {action_meanings[action_idx]}"
-                            else:
-                                action_str = f"{action_idx}: UNKNOWN"
-                        else:
-                            action_str = str(actions_numpy)
-                        f.write(action_str)
+                # Save the current frame and the action that will be taken from it (unless it's the last frame)
+                last_render_start = render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, actions_numpy, action_meanings, is_last)
+                frame_count += 1
                 
                 # Execute the action to transition to next state
                 obs, rew, terminated, truncated, infos = env.step(actions)
@@ -326,10 +316,10 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
                             num_episodes += 1
                             reward_list.append(true_objective)
 
-                # if episode terminated synchronously for all agents, save the final frame
+                # if episode terminated synchronously for all agents, save the final frame without action
                 if all(dones):
-                    # Save the final frame (result of the last action)
-                    render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, None, action_meanings)
+                    # Save the final frame (result of the last action) without an action
+                    render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, None, action_meanings, is_last_frame=True)
                     frame_count += 1
                     time.sleep(0.05)
 
@@ -373,7 +363,9 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
         if cfg.fps > 0:
             fps = cfg.fps
         else:
-            fps = 30
+            # Use 1 FPS for frame-by-frame sampling since each action determines one frame
+            # This makes it easier to observe the action-frame correspondence
+            fps = 1
         generate_replay_video(experiment_dir(cfg=cfg), video_frames, fps, cfg)
     
     if cfg.save_frames:

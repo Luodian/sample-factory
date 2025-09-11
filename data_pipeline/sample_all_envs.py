@@ -50,7 +50,7 @@ def sample_environment(args):
     import glob
     import shutil
     
-    experiment, checkpoint_dir, output_base_dir, frames_per_env, max_episodes, device, randomness, epsilon_greedy = args
+    experiment, checkpoint_dir, output_base_dir, frames_per_env, max_episodes, device, randomness, epsilon_greedy, save_video = args
     
     env_name = extract_env_name(experiment)
     env_output_dir = os.path.join(output_base_dir, env_name)
@@ -93,11 +93,19 @@ def sample_environment(args):
             '--device', device,
             '--save_frames',
             '--frames_dir', temp_dir,
-            '--video_frames', str(frames_per_episode),
+            '--video_frames', str(frames_per_episode) if save_video else str(frames_per_episode),
             '--max_num_frames', str(frames_per_episode),  # IMPORTANT: Hard limit on frames
             '--max_num_episodes', '1',  # Only one episode at a time
             '--no_render'
         ]
+        
+        # Add video saving if requested
+        if save_video:
+            cmd.extend([
+                '--save_video',
+                '--video_name', os.path.join(temp_dir, 'episode_video.mp4'),
+                '--fps', '1'  # 1 FPS since each action determines one frame
+            ])
         
         # Add randomness control (0.0 = deterministic, >0.1 = stochastic)
         if randomness < 0.1:
@@ -136,6 +144,7 @@ def sample_environment(args):
                     # Rename temp to final episode directory
                     os.rename(temp_dir, episode_dir)
                     total_frames_saved += len(saved_frames)
+                    # Video is already in the directory if save_video was enabled
                 else:
                     # Clean up empty temp directory
                     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -150,6 +159,7 @@ def sample_environment(args):
                     try:
                         shutil.move(alt_temp_dir, episode_dir)
                         total_frames_saved += len(saved_frames)
+                        # Video should already be in the directory if save_video was enabled
                     except Exception as e:
                         print(f"Failed to move {alt_temp_dir} to {episode_dir}: {e}")
                         total_frames_saved += len(saved_frames)  # Count them anyway
@@ -185,6 +195,8 @@ def main():
                         help='Randomness level (0.0=deterministic, 1.0=fully stochastic)')
     parser.add_argument('--epsilon-greedy', type=float, default=0.0,
                         help='Epsilon for epsilon-greedy exploration (0.0=no exploration, 0.3=30% random actions)')
+    parser.add_argument('--save-video', action='store_true',
+                        help='Save video files for each episode')
     parser.add_argument('--parallel', type=int, default=4,
                         help='Number of parallel processes')
     parser.add_argument('--device', default='cpu',
@@ -233,7 +245,7 @@ def main():
     # Prepare arguments for parallel processing
     task_args = [
         (exp, args.checkpoint_dir, args.output_dir, 
-         args.frames_per_env, args.max_episodes, args.device, args.randomness, args.epsilon_greedy)
+         args.frames_per_env, args.max_episodes, args.device, args.randomness, args.epsilon_greedy, args.save_video)
         for exp in experiments
     ]
     
