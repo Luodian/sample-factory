@@ -19,7 +19,7 @@ from sample_all_envs import sample_environment, extract_env_name
 # Import convert_to_training_data functions  
 from convert_to_training_data import process_episode, generate_enhanced_description
 
-def sample_single_env(env_name, checkpoint_dir, output_dir, frames_per_env, max_episodes, randomness, device='cpu'):
+def sample_single_env(env_name, checkpoint_dir, output_dir, frames_per_env, max_episodes, randomness, epsilon_greedy=0.0, device='cpu'):
     """Sample frames from a single environment."""
     
     # Find the checkpoint for this environment (prefer seed 1111)
@@ -38,7 +38,7 @@ def sample_single_env(env_name, checkpoint_dir, output_dir, frames_per_env, max_
     print(f"Sampling {env_name} using checkpoint {experiment}...")
     
     # Use the sample_environment function from sample_all_envs.py
-    args = (experiment, checkpoint_dir, output_dir, frames_per_env, max_episodes, device, randomness)
+    args = (experiment, checkpoint_dir, output_dir, frames_per_env, max_episodes, device, randomness, epsilon_greedy)
     _, status, frame_count = sample_environment(args)
     
     if status == 'success':
@@ -162,6 +162,8 @@ def main():
                         help='Maximum episodes to sample')
     parser.add_argument('--randomness', type=float, default=0.2,
                         help='Randomness level')
+    parser.add_argument('--epsilon-greedy', type=float, default=0.0,
+                        help='Epsilon for epsilon-greedy exploration')
     parser.add_argument('--device', default='cpu', help='Device to use')
     parser.add_argument('--skip-sampling', action='store_true',
                         help='Skip sampling and only convert existing frames')
@@ -181,6 +183,7 @@ def main():
             args.frames_per_env,
             args.max_episodes,
             args.randomness,
+            args.epsilon_greedy,
             args.device
         )
         

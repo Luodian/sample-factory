@@ -158,6 +158,11 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
     render_action_repeat: int = cfg.env_frameskip // eval_env_frameskip
     cfg.env_frameskip = cfg.eval_env_frameskip = eval_env_frameskip
     log.debug(f"Using frameskip {cfg.env_frameskip} and {render_action_repeat=} for evaluation")
+    
+    # Add epsilon-greedy exploration parameter
+    epsilon = getattr(cfg, 'epsilon_greedy', 0.0)
+    if epsilon > 0:
+        log.info(f"Using epsilon-greedy exploration with epsilon={epsilon}")
 
     cfg.num_envs = 1
 
@@ -233,6 +238,17 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
             if cfg.eval_deterministic:
                 action_distribution = actor_critic.action_distribution()
                 actions = argmax_actions(action_distribution)
+            
+            # Apply epsilon-greedy exploration
+            epsilon = getattr(cfg, 'epsilon_greedy', 0.0)
+            if epsilon > 0 and np.random.random() < epsilon:
+                # Take random action
+                if hasattr(env.action_space, 'n'):
+                    # Discrete action space
+                    actions = torch.tensor([[np.random.randint(0, env.action_space.n)]], dtype=torch.long, device=device)
+                else:
+                    # Continuous action space
+                    actions = torch.tensor([env.action_space.sample()], dtype=torch.float32, device=device)
 
             # actions shape should be [num_agents, num_actions] even if it's [1, 1]
             if actions.ndim == 1:
@@ -244,9 +260,26 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
             for _ in range(render_action_repeat):
                 # Convert actions to numpy array for saving
                 actions_numpy = actions.cpu().numpy() if torch.is_tensor(actions) else actions
-                last_render_start = render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, actions_numpy, action_meanings)
+                
+                # Save the current frame (state before action)
+                last_render_start = render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, None, action_meanings)
                 frame_count += 1
-
+                
+                # Save the action that will be executed from this frame
+                if cfg.save_frames and frames_dir is not None:
+                    action_path = os.path.join(frames_dir, f"action_{frame_count-1:06d}.txt")
+                    with open(action_path, 'w') as f:
+                        if action_meanings is not None and hasattr(actions_numpy, '__len__'):
+                            action_idx = int(actions_numpy[0]) if len(actions_numpy) > 0 else 0
+                            if 0 <= action_idx < len(action_meanings):
+                                action_str = f"{action_idx}: {action_meanings[action_idx]}"
+                            else:
+                                action_str = f"{action_idx}: UNKNOWN"
+                        else:
+                            action_str = str(actions_numpy)
+                        f.write(action_str)
+                
+                # Execute the action to transition to next state
                 obs, rew, terminated, truncated, infos = env.step(actions)
                 action_mask = obs.pop("action_mask").to(device) if "action_mask" in obs else None
                 dones = make_dones(terminated, truncated)
@@ -293,10 +326,10 @@ def enjoy(cfg: Config) -> Tuple[StatusCode, float]:
                             num_episodes += 1
                             reward_list.append(true_objective)
 
-                # if episode terminated synchronously for all agents, pause a bit before starting a new one
+                # if episode terminated synchronously for all agents, save the final frame
                 if all(dones):
-                    actions_numpy = actions.cpu().numpy() if torch.is_tensor(actions) else actions
-                    render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, actions_numpy, action_meanings)
+                    # Save the final frame (result of the last action)
+                    render_frame(cfg, env, video_frames, num_episodes, last_render_start, frame_count, frames_dir, None, action_meanings)
                     frame_count += 1
                     time.sleep(0.05)
 
