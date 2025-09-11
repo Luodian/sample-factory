@@ -9,9 +9,9 @@ CHECKPOINT_DIR="/opt/tiger/atari_2B/checkpoints"
 FRAMES_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_individual"
 PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_individual"
 FRAMES_PER_ENV=32
-MAX_EPISODES=1
+MAX_EPISODES=1000
 RANDOMNESS=0.2
-PARALLEL_JOBS=1
+PARALLEL_JOBS=32
 
 echo "=== Individual Atari Environment Processing Pipeline ==="
 echo "Configuration:"
@@ -51,10 +51,16 @@ process_env() {
     
     echo "[$env_num/$total] Processing $env_name..."
     
-    # Check if parquet already exists
+    # Check if parquet already exists and remove it (overwrite mode)
     if [ -f "$PARQUET_DIR/${env_name}.parquet" ]; then
-        echo "[$env_num/$total] $env_name already processed, skipping..."
-        return 0
+        echo "[$env_num/$total] Found existing parquet for $env_name, overwriting..."
+        rm -f "$PARQUET_DIR/${env_name}.parquet"
+    fi
+    
+    # Also clean up existing frames if they exist
+    if [ -d "$FRAMES_DIR/${env_name}" ]; then
+        echo "[$env_num/$total] Found existing frames for $env_name, removing..."
+        rm -rf "$FRAMES_DIR/${env_name}"
     fi
     
     # Process the environment

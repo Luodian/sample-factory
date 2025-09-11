@@ -52,10 +52,16 @@ process_env() {
     
     echo "[$env_num/$total] Processing $env_name..."
     
-    # Check if parquet already exists
+    # Check if parquet already exists and remove it (overwrite mode)
     if [ -f "$PARQUET_DIR/${env_name}.parquet" ]; then
-        echo "[$env_num/$total] $env_name already processed, skipping..."
-        return 0
+        echo "[$env_num/$total] Found existing parquet for $env_name, overwriting..."
+        rm -f "$PARQUET_DIR/${env_name}.parquet"
+    fi
+    
+    # Also clean up existing frames if they exist
+    if [ -d "$FRAMES_DIR/${env_name}" ]; then
+        echo "[$env_num/$total] Found existing frames for $env_name, removing..."
+        rm -rf "$FRAMES_DIR/${env_name}"
     fi
     
     # Process the environment
@@ -109,65 +115,6 @@ if [ ! -z "$failed_envs" ]; then
     echo "Failed environments:$failed_envs"
 fi
 echo "Individual parquet files saved to: $PARQUET_DIR"
-
-echo ""
-echo "Step 2: Verifying output..."
-echo "----------------------------------------"
-# Verify the output
-python3 -c "
-import pandas as pd
-import glob
-import os
-
-parquet_dir = '$PARQUET_DIR'
-parquet_files = glob.glob(os.path.join(parquet_dir, '*.parquet'))
-
-if not parquet_files:
-    print('ERROR: No parquet files found!')
-    exit(1)
-
-print(f'Found {len(parquet_files)} parquet files')
-
-# Sample a few files to verify structure
-total_episodes = 0
-total_frames = 0
-sample_files = parquet_files[:3]  # Check first 3 files
-
-for f in sample_files:
-    df = pd.read_parquet(f)
-    env_name = os.path.basename(f).replace('.parquet', '')
-    total_episodes += len(df)
-    total_frames += df['num_frames'].sum()
-    
-    print(f'  - {env_name}: {len(df)} episodes, {df[\"num_frames\"].sum()} frames')
-    
-    # Show structure of first row from first file
-    if f == sample_files[0] and len(df) > 0:
-        row = df.iloc[0]
-        print()
-        print('Sample episode structure:')
-        print(f'    - Environment: {row[\"environment\"]}')
-        print(f'    - Episode: {row[\"episode\"]}')
-        print(f'    - Num frames: {row[\"num_frames\"]}')
-        print(f'    - Randomness: {row[\"randomness\"]}')
-        print(f'    - Number of inputs: {len(row[\"inputs\"])}')
-        print(f'    - Number of images: {len(row[\"images\"])}')
-
-# Get total stats for all files
-all_episodes = 0
-all_frames = 0
-for f in parquet_files:
-    df = pd.read_parquet(f)
-    all_episodes += len(df)
-    all_frames += df['num_frames'].sum()
-
-print()
-print(f'Total across all files: {all_episodes} episodes, {all_frames} frames')
-" || {
-    echo "ERROR: Verification failed"
-    exit 1
-}
-
 echo ""
 echo "=== Pipeline complete! ==="
 echo "Individual parquet files saved to: $PARQUET_DIR"

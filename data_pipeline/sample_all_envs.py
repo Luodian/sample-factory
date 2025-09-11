@@ -75,11 +75,9 @@ def sample_environment(args):
         # Create episode-specific directory with randomness in name
         episode_dir = os.path.join(env_output_dir, f'episode_{episode_idx:03d}_rand{randomness:.1f}')
         
-        # Skip if this episode already exists
+        # Remove existing episode if it exists (overwrite mode)
         if os.path.exists(episode_dir):
-            existing_frames = glob.glob(os.path.join(episode_dir, 'frame_*.png'))
-            total_frames_saved += len(existing_frames)
-            continue
+            shutil.rmtree(episode_dir, ignore_errors=True)
         
         # Create temp directory for this episode
         temp_dir = os.path.join(env_output_dir, f'temp_episode_{episode_idx}')
