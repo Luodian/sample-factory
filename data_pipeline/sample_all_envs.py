@@ -93,6 +93,7 @@ def sample_environment(args):
             '--device', device,
             '--save_frames',
             '--frames_dir', temp_dir,
+            '--eval_env_frameskip', '1',
             # Ensure video collects the full episode when saving video
             '--video_frames', '-1' if save_video else str(frames_per_episode),
             '--max_num_frames', str(frames_per_episode),  # IMPORTANT: Hard limit on frames
@@ -121,12 +122,12 @@ def sample_environment(args):
             cmd.extend(['--epsilon_greedy', str(epsilon_greedy)])
     
         try:
-            # Run the command with timeout
+            # Run the command with extended timeout to accommodate slower runs
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=30  # 30 second timeout per episode
+                timeout=180  # 180 second timeout per episode
             )
             
             # Check for errors in the result

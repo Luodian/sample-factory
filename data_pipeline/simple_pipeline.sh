@@ -6,7 +6,7 @@ FRAMES_DIR="/tmp/test_frames"
 PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_individual_v2"
 FRAMES_PER_ENV=1024
 MAX_EPISODES=3
-RANDOMNESS=0.1
+RANDOMNESS=0.2
 EPSILON_GREEDY=0.2  # 20% random actions for better diversity
 SAVE_VIDEO=true  # Save video for each episode
 
