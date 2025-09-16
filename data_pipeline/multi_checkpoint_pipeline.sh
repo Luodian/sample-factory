@@ -1,13 +1,23 @@
 #!/bin/bash
 
+# uv pip install "gymnasium[atari,accept-rom-license]" shimmy
+# uv pip install ale-py autorom
+# AutoROM --accept-license
+
 # Configuration
-CHECKPOINT_DIR="/opt/tiger/atari_2B/checkpoints"
+CHECKPOINT_DIR="/opt/tiger/sample-factory/checkpoints"
 FRAMES_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_multi_checkpoint"
 PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_multi_checkpoint"
-FRAMES_PER_ENV=32
-MAX_EPISODES=1000  # Episodes per checkpoint
-RANDOMNESS=0.2
+FRAMES_PER_ENV=128
+MAX_EPISODES=100  # Episodes per checkpoint
+RANDOMNESS=0.3
 EPSILON_GREEDY=0.3
+
+# Optional: limit number of environments to process (set to 0 for all)
+MAX_ENVS=${MAX_ENVS:-0}  # Can be overridden by environment variable
+
+# Optional: specific environments to process (comma-separated, e.g., "atari_alien,atari_assault")
+SPECIFIC_ENVS=${SPECIFIC_ENVS:-""}  # Can be overridden by environment variable
 
 echo "=== Multi-Checkpoint Atari Pipeline ==="
 echo "Checkpoint dir: $CHECKPOINT_DIR"
@@ -30,8 +40,8 @@ find_checkpoints() {
     
     # Try to find early, mid, and late checkpoints
     if [ -d "$checkpoint_base" ]; then
-        # Find checkpoint files
-        for ckpt in $(ls -1 "$checkpoint_base"/checkpoint_*.pth 2>/dev/null | sort -V); do
+        # Find checkpoint files inside per-policy subdirs (e.g., checkpoint_p0)
+        for ckpt in $(ls -1 "$checkpoint_base"/checkpoint_p*/checkpoint_*.pth 2>/dev/null | sort -V); do
             checkpoints+=("$ckpt")
         done
     fi
@@ -40,7 +50,29 @@ find_checkpoints() {
 }
 
 # List of environments to process
-ENVS="atari_alien atari_assault atari_asterix"
+if [ -n "$SPECIFIC_ENVS" ]; then
+    # Use specific environments if provided
+    ENVS=$(echo "$SPECIFIC_ENVS" | tr ',' ' ')
+    echo "Using specified environments: $ENVS"
+else
+    # Automatically detect all available environments with _1111 suffix
+    ENVS=$(ls -1 "$CHECKPOINT_DIR" | grep "^edbeeching_atari_2B_.*_1111$" | sed 's/edbeeching_atari_2B_//' | sed 's/_1111$//' | tr '\n' ' ')
+
+    if [ -z "$ENVS" ]; then
+        echo "No environments found with _1111 suffix in $CHECKPOINT_DIR"
+        exit 1
+    fi
+
+    # Apply MAX_ENVS limit if set
+    if [ "$MAX_ENVS" -gt 0 ]; then
+        ENVS=$(echo $ENVS | tr ' ' '\n' | head -n "$MAX_ENVS" | tr '\n' ' ')
+        echo "Limiting to first $MAX_ENVS environments"
+    fi
+fi
+
+ENV_COUNT=$(echo $ENVS | wc -w)
+echo "Will process $ENV_COUNT environment(s): $ENVS"
+echo ""
 
 # Process each environment
 for env_name in $ENVS; do
@@ -104,7 +136,7 @@ from sample_all_envs import sample_environment
 # Use the specific checkpoint
 experiment = 'edbeeching_atari_2B_${env_name}_1111'
 checkpoint_dir = '${CHECKPOINT_DIR}'
-output_dir = '${FRAMES_DIR}'
+output_dir = '${env_frames_dir}'
 frames_per_env = ${FRAMES_PER_ENV}
 max_episodes = ${MAX_EPISODES}
 device = 'cpu'
@@ -123,8 +155,8 @@ if os.path.exists(latest_path):
 shutil.copy2('${checkpoint_path}', latest_path)
 
 # Sample with this checkpoint
-args = (experiment, checkpoint_dir, output_dir + '_ckpt${checkpoint_suffix}', 
-        frames_per_env, max_episodes, device, randomness, epsilon_greedy)
+args = (experiment, checkpoint_dir, output_dir, 
+        frames_per_env, max_episodes, device, randomness, epsilon_greedy, False)
 env_name, status, frame_count = sample_environment(args)
 
 print(f'Result: {status}, {frame_count} frames')
@@ -139,6 +171,76 @@ done
 
 echo "=== Multi-checkpoint pipeline complete! ==="
 echo "Frames saved to: $FRAMES_DIR"
+
+# Also create combined videos from all frames per env/checkpoint
+echo "Creating combined videos from frames..."
+VIDEO_DIR="${FRAMES_DIR}_videos"
+VIDEO_FPS=${VIDEO_FPS:-10}  # Default FPS for combined video
+
+# Create videos using Python (more reliable than ffmpeg)
+python3 -c "
+import os
+import sys
+import imageio.v2 as imageio
+from glob import glob
+from natsort import natsorted
+
+frames_dir = '${FRAMES_DIR}'
+video_dir = '${VIDEO_DIR}'
+fps = ${VIDEO_FPS}
+
+print(f'Creating videos in: {video_dir}')
+os.makedirs(video_dir, exist_ok=True)
+
+# Find all checkpoint directories
+env_dirs = glob(os.path.join(frames_dir, '*_ckpt*'))
+env_dirs = [d for d in env_dirs if os.path.isdir(d)]
+
+if not env_dirs:
+    print('No checkpoint directories found')
+    sys.exit(0)
+
+success_count = 0
+for env_dir in env_dirs:
+    env_name = os.path.basename(env_dir)
+    output_path = os.path.join(video_dir, f'{env_name}.mp4')
+
+    # Find all frames
+    frame_files = glob(os.path.join(env_dir, '**', '*.png'), recursive=True)
+    frame_files = natsorted(frame_files)
+
+    if not frame_files:
+        print(f'No frames found for {env_name}')
+        continue
+
+    print(f'Creating video for {env_name}: {len(frame_files)} frames')
+
+    try:
+        # Create video with macro_block_size=1 to avoid resizing warnings
+        writer = imageio.get_writer(output_path, fps=fps, codec='libx264',
+                                   pixelformat='yuv420p', quality=8,
+                                   macro_block_size=1)
+
+        for i, frame_file in enumerate(frame_files):
+            if i % 100 == 0:
+                print(f'  Processing frame {i}/{len(frame_files)}')
+            frame = imageio.imread(frame_file)
+            writer.append_data(frame)
+
+        writer.close()
+
+        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        print(f'  Created: {output_path} ({size_mb:.1f} MB)')
+        success_count += 1
+
+    except Exception as e:
+        print(f'  Failed to create video for {env_name}: {e}')
+
+print(f'Successfully created {success_count}/{len(env_dirs)} videos')
+"
+
+echo "Videos saved to: $VIDEO_DIR"
+ls -lh "$VIDEO_DIR"/*.mp4 2>/dev/null | wc -l | xargs echo "Total videos created:"
 
 # Now convert all sampled frames to parquet
 echo "Converting frames to parquet format..."
@@ -155,7 +257,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath('$0')))
 from process_individual_env import convert_env_to_parquet
 
-success = convert_env_to_parquet('$(basename $env_dir)', '$(dirname $env_dir)', '$output_file')
+success = convert_env_to_parquet('${env_name}', '${env_dir}', '$output_file')
 if success:
     print(f'Successfully converted to parquet')
 else:

@@ -100,7 +100,24 @@ def atari_env_by_name(name):
 def make_atari_env(env_name, cfg, env_config, render_mode: Optional[str] = None):
     atari_spec = atari_env_by_name(env_name)
 
-    env = gym.make(atari_spec.env_id, render_mode=render_mode)
+    # Try legacy Gym IDs first (e.g., AlienNoFrameskip-v4). If unavailable in
+    # modern Gymnasium, fall back to ALE/<Game>-v5 which is the current naming.
+    try:
+        env = gym.make(atari_spec.env_id, render_mode=render_mode)
+    except Exception as e:
+        alt_env_id = None
+        if "NoFrameskip" in atari_spec.env_id:
+            base = atari_spec.env_id.split("NoFrameskip")[0]
+            alt_env_id = f"ALE/{base}-v5"
+        # If this is already an ALE id or we couldn't construct an alternative,
+        # re-raise the original exception.
+        if alt_env_id is None or atari_spec.env_id.startswith("ALE/"):
+            raise
+        try:
+            env = gym.make(alt_env_id, render_mode=render_mode)
+        except Exception:
+            # If the fallback also fails, propagate the original, more relevant error
+            raise e
 
     if atari_spec.default_timeout is not None:
         env._max_episode_steps = atari_spec.default_timeout
