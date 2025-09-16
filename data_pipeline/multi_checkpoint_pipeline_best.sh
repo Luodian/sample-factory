@@ -68,30 +68,30 @@ declare -a ENV_CONFIGS=(
     "atari_krull:3333"
     "atari_montezuma:3333"
     "atari_mspacman:3333"
-    "atari_namethisgame:3333"
-    "atari_phoenix:3333"
-    "atari_pitfall:3333"
-    "atari_pong:3333"
-    "atari_privateye:3333"
-    "atari_qbert:3333"
-    "atari_riverraid:3333"
-    "atari_roadrunner:3333"
-    "atari_robotank:3333"
-    "atari_seaquest:3333"
-    "atari_skiing:3333"
-    "atari_solaris:3333"
-    "atari_spaceinvaders:3333"
-    "atari_stargunner:3333"
-    "atari_surround:3333"
-    "atari_tennis:3333"
-    "atari_timepilot:3333"
-    "atari_tutankham:3333"
-    "atari_upndown:3333"
-    "atari_venture:3333"
-    "atari_videopinball:3333"
-    "atari_wizardofwor:3333"
-    "atari_yarsrevenge:3333"
-    "atari_zaxxon:3333"
+    # "atari_namethisgame:3333"
+    # "atari_phoenix:3333"
+    # "atari_pitfall:3333"
+    # "atari_pong:3333"
+    # "atari_privateye:3333"
+    # "atari_qbert:3333"
+    # "atari_riverraid:3333"
+    # "atari_roadrunner:3333"
+    # "atari_robotank:3333"
+    # "atari_seaquest:3333"
+    # "atari_skiing:3333"
+    # "atari_solaris:3333"
+    # "atari_spaceinvaders:3333"
+    # "atari_stargunner:3333"
+    # "atari_surround:3333"
+    # "atari_tennis:3333"
+    # "atari_timepilot:3333"
+    # "atari_tutankham:3333"
+    # "atari_upndown:3333"
+    # "atari_venture:3333"
+    # "atari_videopinball:3333"
+    # "atari_wizardofwor:3333"
+    # "atari_yarsrevenge:3333"
+    # "atari_zaxxon:3333"
 )
 
 # Function to process a single environment
@@ -115,9 +115,9 @@ process_environment() {
     rm -rf "$env_frames_dir"
     mkdir -p "$env_frames_dir"
 
-    # Sample frames using the best checkpoint
+    # Sample frames using the best checkpoint (saves each episode to a separate folder)
     echo "[$(date '+%H:%M:%S')] Sampling frames for $env_name..."
-    python -m sf_examples.atari.enjoy_atari \
+    python /opt/tiger/sample-factory/data_pipeline/enjoy_atari_episode_folders.py \
         --env "$env_name" \
         --experiment "$experiment" \
         --train_dir "$CHECKPOINT_DIR" \
@@ -135,20 +135,31 @@ process_environment() {
         return 1
     fi
 
-    # Count frames
+    # Count frames and episodes
+    local episode_count=$(find "$env_frames_dir" -type d -name "episode_*" 2>/dev/null | wc -l)
     local frame_count=$(find "$env_frames_dir" -name "*.png" 2>/dev/null | wc -l)
-    echo "[$(date '+%H:%M:%S')] Sampled $frame_count frames for $env_name"
+    echo "[$(date '+%H:%M:%S')] Sampled $frame_count frames across $episode_count episodes for $env_name"
 
     # Create video from frames
     if [ "$frame_count" -gt 0 ]; then
         echo "[$(date '+%H:%M:%S')] Creating video for $env_name..."
 
-        # Use ffmpeg to create video from frames
-        ffmpeg -y -framerate "$FPS" \
-            -pattern_type glob -i "${env_frames_dir}/*.png" \
+        # Create a combined video from all episode frames
+        # First, create a file list with all frames in order
+        local frame_list_file="${env_frames_dir}/framelist.txt"
+        find "${env_frames_dir}" -name "*.png" | sort | while read frame; do
+            echo "file '$frame'" >> "$frame_list_file"
+        done
+
+        # Use ffmpeg to create video from the frame list
+        ffmpeg -y -f concat -safe 0 -i "$frame_list_file" \
+            -framerate "$FPS" \
             -c:v libx264 -pix_fmt yuv420p -crf 23 \
             "$env_video_path" \
             2>&1 | grep -v "frame=" | sed "s/^/[$env_name] /"
+
+        # Clean up the frame list file
+        rm -f "$frame_list_file"
 
         if [ -f "$env_video_path" ]; then
             local video_size=$(du -h "$env_video_path" | cut -f1)
@@ -191,12 +202,13 @@ echo ""
 
 # Count results
 if [ -d "$FRAMES_DIR" ]; then
-    echo "Frames per environment:"
+    echo "Frames and episodes per environment:"
     for env_dir in "$FRAMES_DIR"/*; do
         if [ -d "$env_dir" ]; then
             env_name=$(basename "$env_dir")
+            episode_count=$(find "$env_dir" -type d -name "episode_*" 2>/dev/null | wc -l)
             frame_count=$(find "$env_dir" -name "*.png" 2>/dev/null | wc -l)
-            echo "  $env_name: $frame_count frames"
+            echo "  $env_name: $episode_count episodes, $frame_count frames"
         fi
     done
 fi
