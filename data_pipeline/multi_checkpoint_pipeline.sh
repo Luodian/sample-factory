@@ -6,8 +6,8 @@
 
 # Configuration
 CHECKPOINT_DIR="/opt/tiger/sample-factory/checkpoints"
-FRAMES_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_multi_checkpoint"
-PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_multi_checkpoint"
+FRAMES_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/sampled_frames_multi_checkpoint_0916"
+PARQUET_DIR="/mnt/bn/seed-aws-va/brianli/prod/contents/atari_2B/parquet_multi_checkpoint_0916"
 FRAMES_PER_ENV=128
 MAX_EPISODES=100  # Episodes per checkpoint
 RANDOMNESS=0.3
