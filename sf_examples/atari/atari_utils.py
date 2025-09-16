@@ -14,9 +14,16 @@ from sample_factory.envs.env_wrappers import (
 # Register ALE environments with Gymnasium
 try:
     import ale_py
-    gym.register_envs(ale_py)
-except ImportError:
-    pass
+    # Use the v0/v4 registration which doesn't require vector imports
+    from ale_py.env import gymnasium as ale_gymnasium
+    ale_gymnasium.register_v0_v4_envs(gym)
+except (ImportError, AttributeError):
+    # Fallback: try the original registration method
+    try:
+        import ale_py
+        gym.register_envs(ale_py)
+    except:
+        pass
 
 ATARI_W = ATARI_H = 84
 
