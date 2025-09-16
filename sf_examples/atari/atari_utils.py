@@ -132,7 +132,7 @@ def make_atari_env(env_name, cfg, env_config, render_mode: Optional[str] = None)
         env = FireResetEnv(env)
     env = ClipRewardEnv(env)
     env = gym.wrappers.ResizeObservation(env, (84, 84))
-    env = gym.wrappers.GrayscaleObservation(env)
+    env = gym.wrappers.GrayScaleObservation(env)
     env = gym.wrappers.FrameStackObservation(env, cfg.env_framestack)
     env = NumpyObsWrapper(env)
     return env
