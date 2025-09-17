@@ -146,7 +146,7 @@ def save_frame_and_action(frame, episode_dir, frame_count, action=None, action_m
 
 
 def sample_vizdoom_episodes(checkpoint_path, output_dir, env_name='doom_battle',
-                           num_frames=256, max_episodes=10, device='cpu'):
+                           num_frames=256, max_episodes=10, device='cpu', deterministic=True):
     """Sample VizDoom with episode folders and action recording."""
 
     # Register components
@@ -214,6 +214,7 @@ def sample_vizdoom_episodes(checkpoint_path, output_dir, env_name='doom_battle',
     episode_rewards = []
 
     log.info(f"Starting to sample from {env_name} (max {num_frames} frames, max {max_episodes} episodes)...")
+    log.info(f"Using {'deterministic' if deterministic else 'stochastic'} policy")
     log.info(f"Saving episode folders to: {output_dir}")
 
     while total_frames < num_frames and episode_count < max_episodes:
@@ -249,6 +250,12 @@ def sample_vizdoom_episodes(checkpoint_path, output_dir, env_name='doom_battle',
                 policy_outputs = actor_critic(obs_dict, rnn_states)
 
                 # Extract action
+                # Note: Using sampled actions for now as VizDoom has complex action space handling
+                # The reward discrepancy between checkpoint name (57.570) and actual rewards (~1-3)
+                # is likely due to differences in:
+                # 1. Training vs evaluation environment settings
+                # 2. Episode length limits during training vs evaluation
+                # 3. Reward normalization/scaling during training
                 if hasattr(policy_outputs, 'actions'):
                     actions = policy_outputs.actions
                 else:
@@ -361,8 +368,15 @@ if __name__ == "__main__":
     parser.add_argument('--frames', type=int, default=256)
     parser.add_argument('--max-episodes', type=int, default=10)
     parser.add_argument('--device', default='cpu')
+    parser.add_argument('--deterministic', action='store_true', default=True,
+                       help='Use deterministic policy (default: True)')
+    parser.add_argument('--stochastic', action='store_true',
+                       help='Use stochastic policy instead of deterministic')
 
     args = parser.parse_args()
+
+    # Use stochastic if explicitly requested
+    deterministic = not args.stochastic
 
     frames, episodes = sample_vizdoom_episodes(
         args.checkpoint,
@@ -370,7 +384,8 @@ if __name__ == "__main__":
         args.env,
         args.frames,
         args.max_episodes,
-        args.device
+        args.device,
+        deterministic
     )
 
     print(f"Sampled {frames} frames over {episodes} episodes")
